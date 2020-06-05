@@ -8,13 +8,15 @@ package bigip
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/f5devcentral/go-bigip"
-	"github.com/hashicorp/terraform/helper/resource"
-	"github.com/hashicorp/terraform/terraform"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"testing"
+
+	"github.com/f5devcentral/go-bigip"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
 //var TEST_DEVICE_NAME = fmt.Sprintf("/%s/test-device", TEST_PARTITION)
@@ -24,7 +26,14 @@ var dir, err = os.Getwd()
 var TEST_AS3_RESOURCE = `
 resource "bigip_as3"  "as3-example" {
      as3_json = "${file("` + dir + `/../examples/as3/example1.json")}"
-     tenant_name = "as3"
+    // tenant_name = "as3"
+}
+`
+
+var TEST_AS3_RESOURCE_INVALID_JSON = `
+resource "bigip_as3"  "as3-example" {
+     as3_json = "${file("` + dir + `/../examples/as3/invalid.json")}"
+    // tenant_name = "as3"
 }
 `
 
@@ -40,7 +49,7 @@ func TestAccBigipAs3_create(t *testing.T) {
 				Config: TEST_AS3_RESOURCE,
 				Check: resource.ComposeTestCheckFunc(
 					testCheckAs3Exists("as3", true),
-					resource.TestCheckResourceAttr("bigip_as3.as3-example", "tenant_name", "as3"),
+					//					resource.TestCheckResourceAttr("bigip_as3.as3-example", "tenant_name", "as3"),
 				),
 			},
 		},
@@ -72,4 +81,20 @@ func testCheckAs3Exists(name string, exists bool) resource.TestCheckFunc {
 		defer resp.Body.Close()
 		return nil
 	}
+}
+
+func TestAccBigipAs3_badJSON(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAcctPreCheck(t)
+		},
+		Providers:    testAccProviders,
+		CheckDestroy: testCheckdevicesDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config:      TEST_AS3_RESOURCE_INVALID_JSON,
+				ExpectError: regexp.MustCompile(`"as3_json" contains an invalid JSON:.*`),
+			},
+		},
+	})
 }
